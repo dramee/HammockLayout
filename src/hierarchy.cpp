@@ -88,8 +88,8 @@ std::vector<Hammock> selectPresentationHammocks(const HammockSet& hammocks) {
     return result;
 }
 
-HammockHierarchy::HammockHierarchy(const Numbering& lNumbering, std::vector<Hammock> family,
-                                   std::span<const HammockKind> kinds) {
+HammockHierarchy::HammockHierarchy(const Numbering& lNumbering, const std::vector<Hammock>& family,
+                                   const std::span<const HammockKind> kinds) {
     const std::size_t n = lNumbering.size();
     if (!kinds.empty() && kinds.size() != family.size()) {
         throw std::invalid_argument("HammockHierarchy: число видов не совпадает с числом гамаков");
@@ -160,7 +160,7 @@ HammockHierarchy::HammockHierarchy(const Numbering& lNumbering, std::vector<Hamm
 }
 
 std::size_t HammockHierarchy::lowestCommonAncestor(std::size_t a, std::size_t b) const {
-    const auto depthOf = [this](std::size_t c) { return c == kRoot ? 0 : clusters_.at(c).depth + 1; };
+    const auto depthOf = [this](const std::size_t c) { return c == kRoot ? 0 : clusters_.at(c).depth + 1; };
     while (depthOf(a) > depthOf(b)) {
         a = clusters_[a].parent;
     }
@@ -184,7 +184,7 @@ HammockHierarchy buildHammockPresentation(const HammockSet& hammocks) {
             kinds.push_back(allKinds[i]);
         }
     }
-    return HammockHierarchy(hammocks.lNumbering(), std::move(family), kinds);
+    return {hammocks.lNumbering(), family, kinds};
 }
 
 }  // namespace hammock

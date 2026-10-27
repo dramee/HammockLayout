@@ -54,7 +54,7 @@ public:
     /// @param kinds виды гамаков в порядке @p family (пустой — все считаются простыми).
     /// @throws std::invalid_argument если семейство не ламинарно, содержит повторы
     ///         или размер @p kinds не совпадает с размером @p family.
-    HammockHierarchy(const Numbering& lNumbering, std::vector<Hammock> family, std::span<const HammockKind> kinds = {});
+    HammockHierarchy(const Numbering& lNumbering, const std::vector<Hammock>& family, std::span<const HammockKind> kinds = {});
 
     [[nodiscard]] std::span<const Cluster> clusters() const noexcept { return clusters_; }
     [[nodiscard]] const Cluster& cluster(std::size_t index) const { return clusters_.at(index); }

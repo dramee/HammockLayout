@@ -22,8 +22,8 @@ std::vector<LinearComponent> findLinearComponents(const ProgramGraph& program) {
     const Numbering nNumbering = computeDepthFirstNumberings(program).n;
 
     // Этап 1. Бикомпоненты в порядке возрастания N-номеров их бивершин.
-    constexpr std::size_t kUnassigned = static_cast<std::size_t>(-1);
-    std::vector<std::size_t> componentOf(n, kUnassigned);
+    constexpr auto kUnassigned = static_cast<std::size_t>(-1);
+    std::vector componentOf(n, kUnassigned);
     std::vector<Bicomponent> components;
     std::vector<VertexId> stack;
 

@@ -5,7 +5,6 @@ project(HammockLayout
     DESCRIPTION "Выделение гамаков ориентированного графа и экспорт иерархии в GraphML"
     LANGUAGES CXX)
 
-option(HAMMOCK_BUILD_CLI "Собирать консольную утилиту hammock-layout" ON)
 option(HAMMOCK_BUILD_TESTS "Собирать модульные тесты" ${PROJECT_IS_TOP_LEVEL})
 option(HAMMOCK_WARNINGS_AS_ERRORS "Считать предупреждения компилятора ошибками" OFF)
 
@@ -44,28 +43,9 @@ target_link_libraries(hammock PRIVATE pugixml::pugixml)
 hammock_set_warnings(hammock)
 
 # ---------------------------------------------------------------------------
-# Консольная утилита
-# ---------------------------------------------------------------------------
-if(HAMMOCK_BUILD_CLI)
-    add_executable(hammock-layout
-        apps/cli_options.cpp
-        apps/main.cpp)
-    target_link_libraries(hammock-layout PRIVATE hammock::hammock)
-    hammock_set_warnings(hammock-layout)
-endif()
-
-# ---------------------------------------------------------------------------
 # Тесты
 # ---------------------------------------------------------------------------
 if(HAMMOCK_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
-endif()
-
-# ---------------------------------------------------------------------------
-# Установка
-# ---------------------------------------------------------------------------
-include(GNUInstallDirs)
-if(HAMMOCK_BUILD_CLI)
-    install(TARGETS hammock-layout RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
