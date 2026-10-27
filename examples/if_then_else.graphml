@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ветвление «если — то — иначе» с последующим оператором. -->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="label" for="node" attr.name="label" attr.type="string"/>
+  <graph id="G" edgedefault="directed">
+    <node id="entry"><data key="label">вход</data></node>
+    <node id="read"><data key="label">read(x)</data></node>
+    <node id="cond"><data key="label">x &gt; 0 ?</data></node>
+    <node id="then"><data key="label">y := x</data></node>
+    <node id="else"><data key="label">y := -x</data></node>
+    <node id="print"><data key="label">print(y)</data></node>
+    <node id="exit"><data key="label">выход</data></node>
+    <edge source="entry" target="read"/>
+    <edge source="read" target="cond"/>
+    <edge source="cond" target="then"/>
+    <edge source="cond" target="else"/>
+    <edge source="then" target="print"/>
+    <edge source="else" target="print"/>
+    <edge source="print" target="exit"/>
+  </graph>
+</graphml>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="label" for="node" attr.name="label" attr.type="string" />
+  <key id="hl_kind" for="node" attr.name="hammock.kind" attr.type="string" />
+  <key id="hl_start" for="node" attr.name="hammock.start" attr.type="string" />
+  <key id="hl_end" for="node" attr.name="hammock.end" attr.type="string" />
+  <key id="hl_size" for="node" attr.name="hammock.size" attr.type="int" />
+  <key id="hl_depth" for="node" attr.name="hammock.depth" attr.type="int" />
+  <graph id="G" edgedefault="directed">
+    <node id="hammock1">
+      <data key="label">Составной гамак 1 (entry)</data>
+      <data key="hl_kind">compound</data>
+      <data key="hl_start">entry</data>
+      <data key="hl_size">8</data>
+      <data key="hl_depth">0</data>
+      <graph id="hammock1:" edgedefault="directed">
+        <node id="hammock2">
+          <data key="label">Простой гамак 2 (entry → read)</data>
+          <data key="hl_kind">simple</data>
+          <data key="hl_start">entry</data>
+          <data key="hl_end">read</data>
+          <data key="hl_size">1</data>
+          <data key="hl_depth">1</data>
+          <graph id="hammock2:" edgedefault="directed">
+            <node id="entry">
+              <data key="label">вход</data>
+            </node>
+          </graph>
+        </node>
+        <node id="hammock3">
+          <data key="label">Простой гамак 3 (read → cond)</data>
+          <data key="hl_kind">simple</data>
+          <data key="hl_start">read</data>
+          <data key="hl_end">cond</data>
+          <data key="hl_size">1</data>
+          <data key="hl_depth">1</data>
+          <graph id="hammock3:" edgedefault="directed">
+            <node id="read">
+              <data key="label">read(x)</data>
+            </node>
+          </graph>
+        </node>
+        <node id="hammock4">
+          <data key="label">Простой гамак 4 (cond → print)</data>
+          <data key="hl_kind">simple</data>
+          <data key="hl_start">cond</data>
+          <data key="hl_end">print</data>
+          <data key="hl_size">4</data>
+          <data key="hl_depth">1</data>
+          <graph id="hammock4:" edgedefault="directed">
+            <node id="cond">
+              <data key="label">x &gt; 0 ?</data>
+            </node>
+            <node id="hammock5">
+              <data key="label">Простой гамак 5 (zero → print)</data>
+              <data key="hl_kind">simple</data>
+              <data key="hl_start">zero</data>
+              <data key="hl_end">print</data>
+              <data key="hl_size">1</data>
+              <data key="hl_depth">2</data>
+              <graph id="hammock5:" edgedefault="directed">
+                <node id="zero">
+                  <data key="label">y := 0</data>
+                </node>
+              </graph>
+            </node>
+            <node id="hammock6">
+              <data key="label">Простой гамак 6 (mul1 → mul2)</data>
+              <data key="hl_kind">simple</data>
+              <data key="hl_start">mul1</data>
+              <data key="hl_end">mul2</data>
+              <data key="hl_size">1</data>
+              <data key="hl_depth">2</data>
+              <graph id="hammock6:" edgedefault="directed">
+                <node id="mul1">
+                  <data key="label">y := x</data>
+                </node>
+              </graph>
+            </node>
+            <node id="hammock7">
+              <data key="label">Простой гамак 7 (mul2 → print)</data>
+              <data key="hl_kind">simple</data>
+              <data key="hl_start">mul2</data>
+              <data key="hl_end">print</data>
+              <data key="hl_size">1</data>
+              <data key="hl_depth">2</data>
+              <graph id="hammock7:" edgedefault="directed">
+                <node id="mul2">
+                  <data key="label">y := y * 2</data>
+                </node>
+              </graph>
+            </node>
+            <edge source="cond" target="mul1" />
+            <edge source="cond" target="zero" />
+            <edge source="mul1" target="mul2" />
+          </graph>
+        </node>
+        <node id="hammock8">
+          <data key="label">Простой гамак 8 (print → exit)</data>
+          <data key="hl_kind">simple</data>
+          <data key="hl_start">print</data>
+          <data key="hl_end">exit</data>
+          <data key="hl_size">1</data>
+          <data key="hl_depth">1</data>
+          <graph id="hammock8:" edgedefault="directed">
+            <node id="print">
+              <data key="label">print(y)</data>
+            </node>
+          </graph>
+        </node>
+        <node id="hammock9">
+          <data key="label">Простой гамак 9 (exit)</data>
+          <data key="hl_kind">simple</data>
+          <data key="hl_start">exit</data>
+          <data key="hl_size">1</data>
+          <data key="hl_depth">1</data>
+          <graph id="hammock9:" edgedefault="directed">
+            <node id="exit">
+              <data key="label">выход</data>
+            </node>
+          </graph>
+        </node>
+        <edge source="entry" target="read" />
+        <edge source="read" target="cond" />
+        <edge source="mul2" target="print" />
+        <edge source="zero" target="print" />
+        <edge source="print" target="exit" />
+      </graph>
+    </node>
+  </graph>
+</graphml>

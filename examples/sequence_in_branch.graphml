@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ветвление, одна из ветвей которого — последовательность двух операторов:
+
+    read(x)
+    if x > 0:
+        y := x
+        y := y * 2
+    else:
+        y := 0
+    print(y)
+
+  Последовательность {mul1, mul2} — разложимый, но не составной гамак, поэтому
+  в гамачное представление (presentation) она не входит, а в стратегию strong
+  входит как гамак, не пересекающийся частично ни с одним другим.
+-->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="label" for="node" attr.name="label" attr.type="string"/>
+  <graph id="G" edgedefault="directed">
+    <node id="entry"><data key="label">вход</data></node>
+    <node id="read"><data key="label">read(x)</data></node>
+    <node id="cond"><data key="label">x &gt; 0 ?</data></node>
+    <node id="mul1"><data key="label">y := x</data></node>
+    <node id="mul2"><data key="label">y := y * 2</data></node>
+    <node id="zero"><data key="label">y := 0</data></node>
+    <node id="print"><data key="label">print(y)</data></node>
+    <node id="exit"><data key="label">выход</data></node>
+    <edge source="entry" target="read"/>
+    <edge source="read" target="cond"/>
+    <edge source="cond" target="mul1"/>
+    <edge source="cond" target="zero"/>
+    <edge source="mul1" target="mul2"/>
+    <edge source="mul2" target="print"/>
+    <edge source="zero" target="print"/>
+    <edge source="print" target="exit"/>
+  </graph>
+</graphml>

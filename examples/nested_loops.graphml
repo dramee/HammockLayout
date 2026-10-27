@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Две вложенные циклические конструкции с ветвлением в теле:
+
+    s := 0; i := 0
+    while i < n:
+        j := 0
+        while j < m:
+            if a[i][j] > 0: s := s + a[i][j] else: s := s - 1
+            j := j + 1
+        i := i + 1
+    print(s)
+-->
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="label" for="node" attr.name="label" attr.type="string"/>
+  <graph id="G" edgedefault="directed">
+    <node id="entry"><data key="label">вход</data></node>
+    <node id="init"><data key="label">s := 0; i := 0</data></node>
+    <node id="outer"><data key="label">i &lt; n ?</data></node>
+    <node id="initj"><data key="label">j := 0</data></node>
+    <node id="inner"><data key="label">j &lt; m ?</data></node>
+    <node id="cond"><data key="label">a[i][j] &gt; 0 ?</data></node>
+    <node id="add"><data key="label">s := s + a[i][j]</data></node>
+    <node id="sub"><data key="label">s := s - 1</data></node>
+    <node id="incj"><data key="label">j := j + 1</data></node>
+    <node id="inci"><data key="label">i := i + 1</data></node>
+    <node id="print"><data key="label">print(s)</data></node>
+    <node id="exit"><data key="label">выход</data></node>
+    <edge source="entry" target="init"/>
+    <edge source="init" target="outer"/>
+    <edge source="outer" target="initj"/>
+    <edge source="outer" target="print"/>
+    <edge source="initj" target="inner"/>
+    <edge source="inner" target="cond"/>
+    <edge source="inner" target="inci"/>
+    <edge source="cond" target="add"/>
+    <edge source="cond" target="sub"/>
+    <edge source="add" target="incj"/>
+    <edge source="sub" target="incj"/>
+    <edge source="incj" target="inner"/>
+    <edge source="inci" target="outer"/>
+    <edge source="print" target="exit"/>
+  </graph>
+</graphml>
