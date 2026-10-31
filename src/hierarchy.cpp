@@ -1,11 +1,66 @@
 #include "hammock/hierarchy.hpp"
 
 #include <algorithm>
+#include <bit>
+#include <limits>
 #include <numeric>
 #include <stdexcept>
 #include <utility>
 
 namespace hammock {
+namespace {
+
+/// Разреженная таблица: значение идемпотентной операции (min, max) на отрезке за O(1).
+template <typename Op>
+class SparseTable {
+public:
+    SparseTable(std::vector<std::size_t> values, Op op) : op_(op) {
+        const std::size_t n = values.size();
+        levels_.push_back(std::move(values));
+        for (std::size_t width = 2; width <= n; width *= 2) {
+            const auto& previous = levels_.back();
+            std::vector<std::size_t> level(n - width + 1);
+            for (std::size_t i = 0; i < level.size(); ++i) {
+                level[i] = op_(previous[i], previous[i + width / 2]);
+            }
+            levels_.push_back(std::move(level));
+        }
+    }
+
+    /// Значение операции на полуинтервале [lo, hi), lo < hi.
+    [[nodiscard]] std::size_t query(std::size_t lo, std::size_t hi) const {
+        const auto k = static_cast<std::size_t>(std::bit_width(hi - lo) - 1);
+        return op_(levels_[k][lo], levels_[k][hi - (std::size_t{1} << k)]);
+    }
+
+private:
+    Op op_;
+    std::vector<std::vector<std::size_t>> levels_;
+};
+
+/// Индексы отрезков @p candidates, которые частично пересекаются хотя бы с одним другим из них.
+/// Отрезок [a, c) пересекает [b, d) частично, если a < b < c < d или b < a < d < c.
+std::vector<bool> crossingIntervals(const std::vector<Hammock>& candidates, std::size_t n) {
+    constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
+    std::vector<std::size_t> maxLastFrom(n + 1, 0);     // наибольший конец среди начинающихся в позиции
+    std::vector<std::size_t> minFirstTo(n + 1, kNone);  // наименьшее начало среди заканчивающихся в позиции
+    for (const Hammock& h : candidates) {
+        maxLastFrom[h.first] = std::max(maxLastFrom[h.first], h.last());
+        minFirstTo[h.last()] = std::min(minFirstTo[h.last()], h.first);
+    }
+    const SparseTable maxTable(std::move(maxLastFrom), [](std::size_t x, std::size_t y) { return std::max(x, y); });
+    const SparseTable minTable(std::move(minFirstTo), [](std::size_t x, std::size_t y) { return std::min(x, y); });
+
+    std::vector<bool> crossing(candidates.size(), false);
+    for (std::size_t i = 0; i < candidates.size(); ++i) {
+        const std::size_t a = candidates[i].first;
+        const std::size_t c = candidates[i].last();
+        crossing[i] = c - a >= 2 && (maxTable.query(a + 1, c) > c || minTable.query(a + 1, c) < a);
+    }
+    return crossing;
+}
+
+}  // namespace
 
 std::string_view toString(HammockKind kind) noexcept {
     switch (kind) {
@@ -22,12 +77,18 @@ std::string_view toString(HammockKind kind) noexcept {
 std::vector<HammockKind> classifyHammocks(const HammockSet& hammocks) {
     const std::size_t n = hammocks.lNumbering().size();
 
-    // endsFrom[a] — правые концы отрезков-гамаков, начинающихся в a, по возрастанию.
+    // endsFrom[a] — правые концы отрезков-гамаков, начинающихся в a;
+    // startsTo[c] — левые концы отрезков-гамаков, заканчивающихся в c (по возрастанию).
     std::vector<std::vector<std::size_t>> endsFrom(n + 1);
+    std::vector<std::vector<std::size_t>> startsTo(n + 1);
     for (const Hammock& h : hammocks) {
         endsFrom[h.first].push_back(h.last());
+        startsTo[h.last()].push_back(h.first);
     }
     for (auto& list : endsFrom) {
+        std::ranges::sort(list);
+    }
+    for (auto& list : startsTo) {
         std::ranges::sort(list);
     }
     const auto isHammockInterval = [&](std::size_t a, std::size_t c) {
@@ -58,20 +119,27 @@ std::vector<HammockKind> classifyHammocks(const HammockSet& hammocks) {
         }
     }
 
-    // Составные — разложимые гамаки, не содержащиеся строго в других разложимых.
-    // Отрезки упорядочиваются по началу, при равных началах — по убыванию конца;
-    // отрезок вложен в один из предыдущих тогда и только тогда, когда максимум
-    // концов предыдущих отрезков не меньше его конца.
-    std::ranges::sort(decomposableIndices, [&](std::size_t i, std::size_t j) {
-        const Hammock& x = hammocks[i];
-        const Hammock& y = hammocks[j];
-        return x.first != y.first ? x.first < y.first : x.last() > y.last();
-    });
-    std::size_t maxLast = 0;
+    // Максимальный разложимый гамак нельзя продолжить соседним гамаком:
+    // ни [a, c) ∪ [c, d), ни [e, a) ∪ [a, c) не является гамаком.
+    const auto extendable = [&](const Hammock& h) {
+        return std::ranges::any_of(endsFrom[h.last()], [&](std::size_t d) { return isHammockInterval(h.first, d); }) ||
+               std::ranges::any_of(startsTo[h.first], [&](std::size_t e) { return isHammockInterval(e, h.last()); });
+    };
+    std::vector<std::size_t> maximalIndices;
+    std::vector<Hammock> maximal;
     for (const std::size_t i : decomposableIndices) {
-        if (hammocks[i].last() > maxLast) {
-            kinds[i] = HammockKind::Compound;
-            maxLast = hammocks[i].last();
+        if (!extendable(hammocks[i])) {
+            maximalIndices.push_back(i);
+            maximal.push_back(hammocks[i]);
+        }
+    }
+
+    // Частично пересекающиеся максимальные разложимые гамаки (тело цикла a; L; b)
+    // составными не считаются: иначе гамачное представление не было бы иерархией.
+    const std::vector<bool> crossing = crossingIntervals(maximal, n);
+    for (std::size_t k = 0; k < maximalIndices.size(); ++k) {
+        if (!crossing[k]) {
+            kinds[maximalIndices[k]] = HammockKind::Compound;
         }
     }
     return kinds;

@@ -1,25 +1,41 @@
 #pragma once
 
-#include "hammock/hammocks.hpp"
 #include <span>
 #include <string_view>
 #include <vector>
+#include "hammock/hammocks.hpp"
 
 namespace hammock {
 
+/// Вид гамака (В. Н. Касьянов, «Оптимизирующие преобразования программ», 1988, гл. 8, п. 3.1.4).
 enum class HammockKind {
     /// Простой (неразложимый) гамак: не является объединением двух непересекающихся гамаков.
     Simple,
     /// Составной гамак: максимальный разложимый гамак.
     Compound,
-    /// Разложимый, но не максимальный гамак (в гамачное представление не входит).
+    /// Разложимый, но не составной гамак (в гамачное представление не входит).
     Decomposable,
 };
 
 /// Текстовое имя вида гамака ("simple", "compound", "decomposable").
 [[nodiscard]] std::string_view toString(HammockKind kind) noexcept;
 
-
+/// @brief Классифицирует каждый гамак множества @p hammocks (результат — в том же порядке).
+///
+/// Гамак H разложим, если H = A ∪ B для непересекающихся гамаков A и B, т. е. его
+/// отрезок L-нумерации [a, c) делится точкой b на гамаки [a, b) и [b, c). Иначе
+/// говоря, H как граф программы состоит более чем из одной линейной компоненты.
+///
+/// Разложимый гамак составной, если он максимален — его нельзя продолжить соседним
+/// гамаком так, чтобы объединение снова было гамаком (H не является частью цепочки
+/// линейных компонент большего гамака), — и не пересекается частично ни с одним
+/// другим максимальным разложимым гамаком. Последнее условие нужно для тела цикла
+/// из трёх и более частей (`while (c) { a; m; b; }`): {a, m} и {m, b} максимальны и
+/// пересекаются, а всё тело гамаком не является; такие части остаются простыми
+/// гамаками внутри цикла. На графах без таких циклов определение совпадает с книгой
+/// (пример 8.6, свойства 8.12–8.15).
+///
+/// Сложность O(h log h + n log n) плюс просмотр гамаков с общими концами.
 [[nodiscard]] std::vector<HammockKind> classifyHammocks(const HammockSet& hammocks);
 
 /// Возвращает простые и составные гамаки — гамачное представление графа.
@@ -54,7 +70,8 @@ public:
     /// @param kinds виды гамаков в порядке @p family (пустой — все считаются простыми).
     /// @throws std::invalid_argument если семейство не ламинарно, содержит повторы
     ///         или размер @p kinds не совпадает с размером @p family.
-    HammockHierarchy(const Numbering& lNumbering, const std::vector<Hammock>& family, std::span<const HammockKind> kinds = {});
+    HammockHierarchy(const Numbering& lNumbering, const std::vector<Hammock>& family,
+                     std::span<const HammockKind> kinds = {});
 
     [[nodiscard]] std::span<const Cluster> clusters() const noexcept { return clusters_; }
     [[nodiscard]] const Cluster& cluster(std::size_t index) const { return clusters_.at(index); }

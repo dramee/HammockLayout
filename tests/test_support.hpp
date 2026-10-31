@@ -63,6 +63,47 @@ inline ProgramGraph randomProgramGraph(std::mt19937& rng, std::size_t n, std::si
     return {std::move(graph), id[0], id[n - 1]};
 }
 
+/// Случайный граф структурной программы из последовательностей, if, if-else и циклов while
+/// (тела циклов — последовательности из нескольких операторов). Генерация повторяется,
+/// пока число вершин не станет не больше @p maxVertices (≥ 3).
+inline ProgramGraph randomStructuredProgram(std::mt19937& rng, std::size_t maxVertices) {
+    const auto pick = [&](int lo, int hi) { return std::uniform_int_distribution<int>(lo, hi)(rng); };
+    const int maxDepth = maxVertices <= 12 ? 2 : 3;
+
+    for (;;) {
+        Digraph graph(2);  // 0 — вход, 1 — выход
+        // Оператор, все выходы которого ведут в cont; возвращает его первую вершину.
+        const auto statement = [&](auto& self, int depth, VertexId cont) -> VertexId {
+            const auto block = [&](VertexId next) {
+                for (int i = pick(1, 4); i > 0; --i) {
+                    next = self(self, depth - 1, next);
+                }
+                return next;
+            };
+            const int kind = depth <= 0 ? 0 : pick(0, 3);
+            const VertexId s = graph.addVertex();
+            if (kind == 0) {  // простой оператор
+                graph.addEdge(s, cont);
+            } else if (kind == 3) {  // while: заголовок → тело → заголовок
+                graph.addEdge(s, block(s));
+                graph.addEdge(s, cont);
+            } else {  // if (kind 1) и if-else (kind 2)
+                graph.addEdge(s, block(cont));
+                graph.addEdge(s, kind == 2 ? block(cont) : cont);
+            }
+            return s;
+        };
+        VertexId first = 1;
+        for (int i = pick(1, 4); i > 0; --i) {
+            first = statement(statement, maxDepth, first);
+        }
+        graph.addEdge(0, first);
+        if (graph.vertexCount() <= maxVertices) {
+            return {std::move(graph), 0, 1};
+        }
+    }
+}
+
 /// Гамак в каноническом виде: (отсортированные вершины, начало, конец).
 using HammockKey = std::tuple<std::vector<VertexId>, VertexId, VertexId>;
 
