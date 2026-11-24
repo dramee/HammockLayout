@@ -1,5 +1,7 @@
 #include "hammock/hierarchy.hpp"
 
+#include "hammock/linear_components.hpp"
+
 #include <algorithm>
 #include <bit>
 #include <limits>
@@ -41,6 +43,9 @@ private:
 /// Индексы отрезков @p candidates, которые частично пересекаются хотя бы с одним другим из них.
 /// Отрезок [a, c) пересекает [b, d) частично, если a < b < c < d или b < a < d < c.
 std::vector<bool> crossingIntervals(const std::vector<Hammock>& candidates, std::size_t n) {
+    if (candidates.size() < 2) {
+        return std::vector<bool>(candidates.size(), false);
+    }
     constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
     std::vector<std::size_t> maxLastFrom(n + 1, 0);     // наибольший конец среди начинающихся в позиции
     std::vector<std::size_t> minFirstTo(n + 1, kNone);  // наименьшее начало среди заканчивающихся в позиции
@@ -58,6 +63,148 @@ std::vector<bool> crossingIntervals(const std::vector<Hammock>& candidates, std:
         crossing[i] = c - a >= 2 && (maxTable.query(a + 1, c) > c || minTable.query(a + 1, c) < a);
     }
     return crossing;
+}
+
+// Полный набор гамаков CFG либо все его гамаки внутри одной линейной компоненты.
+// findHammocks даёт интервалы в порядке (first, last), фильтрация сохраняет порядок.
+std::vector<HammockKind> classifyProgramHammocks(const ProgramGraph& program, const HammockSet& hammocks) {
+    const Digraph& graph = program.graph();
+    const Numbering& l = hammocks.lNumbering();
+    const std::size_t n = l.size();
+    std::vector<std::vector<std::size_t>> successors(n);
+    std::vector<std::vector<std::size_t>> predecessors(n);
+    std::vector<std::size_t> leftmostPred(n);
+    std::iota(leftmostPred.begin(), leftmostPred.end(), std::size_t{0});
+    auto rightmostPred = leftmostPred;
+    std::vector<std::size_t> lastSource(n, n);
+    for (std::size_t source = 0; source < n; ++source) {
+        for (const VertexId v : graph.successors(l.vertexAt(source))) {
+            const std::size_t target = l[v];
+            // Кратные дуги учитываем один раз. Предшественники идут по возрастанию L.
+            if (lastSource[target] != source) {
+                lastSource[target] = source;
+                successors[source].push_back(target);
+                predecessors[target].push_back(source);
+                leftmostPred[target] = std::min(leftmostPred[target], source);
+                rightmostPred[target] = std::max(rightmostPred[target], source);
+            }
+        }
+    }
+
+    std::vector<std::vector<std::size_t>> byFirst(n);
+    std::vector<std::vector<std::size_t>> byLast(n + 1);
+    for (std::size_t i = 0; i < hammocks.size(); ++i) {
+        byFirst[hammocks[i].first].push_back(i);
+        byLast[hammocks[i].last()].push_back(i);
+    }
+
+    std::vector<HammockKind> kinds(hammocks.size(), HammockKind::Simple);
+    std::vector<bool> canExtendLeft(hammocks.size(), false);
+    std::vector<std::size_t> marked(n + 1, n);
+    for (std::size_t a = 0; a < n; ++a) {
+        // При склейке [e,a) и [a,c) все предшественники стыка a
+        // должны попасть в [e,c). Сначала отбираем допустимые левые части.
+        std::size_t prefixCount = 0;
+        for (const std::size_t i : byLast[a]) {
+            const Hammock& prefix = hammocks[i];
+            if (prefix.first <= leftmostPred[a] && prefix.end == l.vertexAt(a)) {
+                marked[prefix.first] = a;
+                ++prefixCount;
+            }
+        }
+
+        std::size_t lastCut = a;
+        std::size_t lastBackEdge = a;
+        auto pred = predecessors[a].begin();
+        for (const std::size_t i : byFirst[a]) {
+            const Hammock& h = hammocks[i];
+            const std::size_t c = h.last();
+            while (pred != predecessors[a].end() && *pred < c) {
+                lastBackEdge = std::max(lastBackEdge, *pred);
+                ++pred;
+            }
+            // Суффикс [b,c) может возвращаться в префикс только дугой в a.
+            // Если она блокирует самый правый стык b, то блокирует и более ранние.
+            if (lastCut > lastBackEdge) {
+                kinds[i] = HammockKind::Decomposable;
+                if (c > rightmostPred[a] && prefixCount != 0) {
+                    std::size_t allowed = prefixCount;
+                    if (h.hasEnd()) {
+                        const std::size_t q = l[h.end];
+                        // Конец объединения не может совпадать с его началом
+                        // или иметь дугу в него.
+                        allowed -= marked[q] == a;
+                        for (const std::size_t v : successors[q]) {
+                            if (v != q) {
+                                allowed -= marked[v] == a;
+                            }
+                        }
+                    }
+                    canExtendLeft[i] = allowed != 0;
+                }
+            }
+            if (c < n && h.end == l.vertexAt(c)) {
+                lastCut = c;
+            }
+        }
+    }
+
+    std::ranges::fill(marked, n);
+    std::vector<Hammock> maximal;
+    std::vector<std::size_t> maximalIndices;
+    for (std::size_t b = 0; b <= n; ++b) {
+        std::size_t suffixCount = 0;
+        if (b < n) {
+            // У гамаков с одним началом конечная вершина однозначно задаёт интервал.
+            // Позиция n служит меткой гамака без конечной вершины.
+            for (const std::size_t i : byFirst[b]) {
+                const Hammock& suffix = hammocks[i];
+                if (suffix.last() > rightmostPred[b]) {
+                    marked[suffix.hasEnd() ? l[suffix.end] : n] = b;
+                    ++suffixCount;
+                }
+            }
+        }
+        for (const std::size_t i : byLast[b]) {
+            if (kinds[i] != HammockKind::Decomposable || canExtendLeft[i]) {
+                continue;
+            }
+            const Hammock& h = hammocks[i];
+            const std::size_t a = h.first;
+            if (suffixCount != 0 && h.end == l.vertexAt(b) && a <= leftmostPred[b]) {
+                std::size_t allowed = suffixCount - (marked[a] == b);
+                for (const std::size_t v : predecessors[a]) {
+                    if (v != a) {
+                        allowed -= marked[v] == b;
+                    }
+                }
+                if (allowed != 0) {
+                    continue;
+                }
+            }
+            maximal.push_back(h);
+            maximalIndices.push_back(i);
+        }
+    }
+    const auto crossing = crossingIntervals(maximal, n);
+    for (std::size_t i = 0; i < maximal.size(); ++i) {
+        if (!crossing[i]) {
+            kinds[maximalIndices[i]] = HammockKind::Compound;
+        }
+    }
+    return kinds;
+}
+
+HammockHierarchy makePresentation(const HammockSet& hammocks, std::span<const HammockKind> allKinds) {
+    std::vector<Hammock> family;
+    std::vector<HammockKind> kinds;
+    for (std::size_t i = 0; i < hammocks.size(); ++i) {
+        if (allKinds[i] != HammockKind::Decomposable && !hammocks[i].isTrivial()) {
+            family.push_back(hammocks[i]);
+            kinds.push_back(allKinds[i]);
+        }
+    }
+    return {hammocks.lNumbering(), family, kinds};
 }
 
 }  // namespace
@@ -243,16 +390,86 @@ std::size_t HammockHierarchy::lowestCommonAncestor(std::size_t a, std::size_t b)
 }
 
 HammockHierarchy buildHammockPresentation(const HammockSet& hammocks) {
-    const std::vector<HammockKind> allKinds = classifyHammocks(hammocks);
-    std::vector<Hammock> family;
-    std::vector<HammockKind> kinds;
-    for (std::size_t i = 0; i < hammocks.size(); ++i) {
-        if (allKinds[i] != HammockKind::Decomposable && !hammocks[i].isTrivial()) {
-            family.push_back(hammocks[i]);
-            kinds.push_back(allKinds[i]);
+    return makePresentation(hammocks, classifyHammocks(hammocks));
+}
+
+HammockHierarchy buildHammockPresentation(const ProgramGraph& program) {
+    const auto components = findLinearComponents(program);
+    if (components.size() == 1 && components.front().vertices.size() > 1) {
+        // Вся программа до выходной вершины уже образует одну компоненту.
+        const HammockSet found = findHammocks(program);
+        return makePresentation(found, classifyProgramHammocks(program, found));
+    }
+
+    const Digraph& graph = program.graph();
+    const std::size_t n = program.vertexCount();
+    std::vector<VertexId> order;
+    order.reserve(n);
+    // Граф разбивается на гамак без выходной вершины CFG и одноэлементный гамак из неё.
+    std::vector<Hammock> family{{program.entry(), kNoVertex, 0, n}};
+    std::vector<HammockKind> kinds{HammockKind::Compound};
+    std::vector<VertexId> localId(n, kNoVertex);
+    for (const LinearComponent& component : components) {
+        const std::vector<VertexId>& vertices = component.vertices;
+        const std::size_t size = vertices.size();
+        if (size == 1) {
+            if (graph.hasEdge(component.start, component.start)) {
+                family.push_back({component.start, component.end, order.size(), 1, true});
+                kinds.push_back(HammockKind::Simple);
+            }
+            order.push_back(component.start);
+            continue;
+        }
+
+        for (VertexId v = 0; v < size; ++v) {
+            localId[vertices[v]] = v;
+        }
+        // Начало компоненты может иметь внутренних предшественников.
+        // Вспомогательный вход сохраняет эти дуги и удовлетворяет контракту ProgramGraph.
+        const VertexId localEntry = size;
+        const VertexId localExit = size + 1;
+        Digraph localGraph(size + 2);
+        localGraph.addEdge(localEntry, localId[component.start]);
+        for (VertexId v = 0; v < size; ++v) {
+            for (const VertexId successor : graph.successors(vertices[v])) {
+                localGraph.addEdge(v, successor == component.end ? localExit : localId[successor]);
+            }
+        }
+        const ProgramGraph localProgram(std::move(localGraph), localEntry, localExit);
+        const HammockSet found = findHammocks(localProgram);
+        const Numbering& localOrder = found.lNumbering();
+        std::vector<std::size_t> position(size);
+        for (const VertexId v : localOrder.order()) {
+            if (v < size) {
+                position[v] = order.size();
+                order.push_back(vertices[v]);
+            }
+        }
+
+        // Продолжения за пределы компоненты пропускаем при отборе её гамаков.
+        std::vector<Hammock> inside;
+        for (const Hammock& h : found) {
+            if (!found.contains(h, localEntry) && !found.contains(h, localExit)) {
+                inside.push_back(h);
+            }
+        }
+        const HammockSet localHammocks(localOrder, std::move(inside));
+        const auto localKinds = classifyProgramHammocks(localProgram, localHammocks);
+        for (std::size_t i = 0; i < localHammocks.size(); ++i) {
+            const Hammock& h = localHammocks[i];
+            if (localKinds[i] != HammockKind::Decomposable && !h.isTrivial()) {
+                const VertexId end = h.end == localExit ? component.end : vertices.at(h.end);
+                family.push_back({vertices[h.start], end, position[h.start], h.size, h.singletonHasLoop});
+                kinds.push_back(localKinds[i]);
+            }
+        }
+        for (const VertexId v : vertices) {
+            localId[v] = kNoVertex;
         }
     }
-    return {hammocks.lNumbering(), family, kinds};
+    // Выход CFG образует последнюю одноэлементную компоненту без петли.
+    order.push_back(program.exit());
+    return {Numbering(std::move(order)), family, kinds};
 }
 
 }  // namespace hammock

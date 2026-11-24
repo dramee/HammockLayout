@@ -65,7 +65,7 @@ TEST_P(Example, MatchesExpectedPresentation) {
     }
 
     std::ostringstream out;
-    document.writeHierarchical(out, buildHammockPresentation(hammocks));
+    document.writeHierarchical(out, buildHammockPresentation(program));
     const std::string actual = out.str();
 
     if (std::getenv("HAMMOCK_UPDATE_EXAMPLES") != nullptr) {

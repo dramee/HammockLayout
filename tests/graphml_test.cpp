@@ -37,7 +37,7 @@ constexpr const char* kIfThenElse = R"(<?xml version="1.0" encoding="UTF-8"?>
 
 std::string writeHierarchy(const GraphMLDocument& document, std::string_view entryId, std::string_view exitId) {
     const ProgramGraph program(document.graph(), document.findNode(entryId).value(), document.findNode(exitId).value());
-    const auto hierarchy = buildHammockPresentation(findHammocks(program));
+    const auto hierarchy = buildHammockPresentation(program);
     std::ostringstream out;
     document.writeHierarchical(out, hierarchy);
     return out.str();

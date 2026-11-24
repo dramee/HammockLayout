@@ -107,4 +107,9 @@ private:
 /// (одновершинные гамаки входят в дерево только при наличии петли).
 [[nodiscard]] HammockHierarchy buildHammockPresentation(const HammockSet& hammocks);
 
+/// Строит гамачное представление непосредственно из CFG.
+/// Поиск выполняется внутри линейных компонент, а составной корень добавляется сразу.
+/// Время построения O(nm), где n — число вершин, m — число дуг.
+[[nodiscard]] HammockHierarchy buildHammockPresentation(const ProgramGraph& program);
+
 }  // namespace hammock

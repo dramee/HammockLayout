@@ -168,7 +168,7 @@ TEST(PresentationHammocks, BookExample) {
     }
     EXPECT_EQ(selected, expectedPresentation);  // {10} и {11} с петлями остаются
 
-    const auto hierarchy = buildHammockPresentation(hammocks);
+    const auto hierarchy = buildHammockPresentation(program);
     const auto verticesOf = [&](std::size_t index) {
         const auto vertices = hammocks.vertices(hierarchy.cluster(index).hammock);
         VertexSet key(vertices.begin(), vertices.end());
@@ -210,7 +210,7 @@ TEST(PresentationHammocks, LoopBodyOfThreeParts) {
     EXPECT_EQ(expected.at(VertexSet{2, 3}), HammockKind::Decomposable);
     EXPECT_EQ(expected.at(VertexSet{3, 4}), HammockKind::Decomposable);
 
-    const auto hierarchy = buildHammockPresentation(findHammocks(program));
+    const auto hierarchy = buildHammockPresentation(program);
     const auto loop = hierarchy.clusterOf(1);  // гамак цикла {h, a, m, b}
     ASSERT_NE(loop, HammockHierarchy::kRoot);
     EXPECT_EQ(hierarchy.cluster(loop).hammock.size, 4U);
@@ -224,7 +224,8 @@ TEST(PresentationHammocks, LoopBodyOfThreeParts) {
 TEST(PresentationHammocks, WholeGraphIsTheCompoundRoot) {
     // Весь граф — гамак без конечной вершины; для цепочки он составной,
     // а простые гамаки — только одноэлементные.
-    const auto hammocks = findHammocks(test::makeChain(5));
+    const auto program = test::makeChain(5);
+    const auto hammocks = findHammocks(program);
     const auto kinds = classifyHammocks(hammocks);
     std::size_t compound = 0;
     for (std::size_t i = 0; i < hammocks.size(); ++i) {
@@ -239,11 +240,16 @@ TEST(PresentationHammocks, WholeGraphIsTheCompoundRoot) {
     }
     EXPECT_EQ(compound, 1U);
     EXPECT_EQ(selectPresentationHammocks(hammocks).size(), 1U);
+    const auto hierarchy = buildHammockPresentation(program);
+    ASSERT_EQ(hierarchy.clusters().size(), 1U);
+    const auto& root = hierarchy.cluster(0);
+    EXPECT_EQ(root.kind, HammockKind::Compound);
+    EXPECT_EQ(root.ownVertices, (std::vector<VertexId>{0, 1, 2, 3, 4}));
 }
 
 TEST(PresentationHammocks, KeepsSingletonWithLoop) {
     const ProgramGraph program(test::makeGraph(3, {{0, 1}, {1, 1}, {1, 2}}), 0, 2);
-    const auto hierarchy = buildHammockPresentation(findHammocks(program));
+    const auto hierarchy = buildHammockPresentation(program);
     ASSERT_EQ(hierarchy.clusters().size(), 2U);
     ASSERT_EQ(hierarchy.topLevelClusters().size(), 1U);
     const auto& root = hierarchy.cluster(hierarchy.topLevelClusters()[0]);
@@ -261,10 +267,15 @@ TEST(PresentationHammocks, KeepsSingletonWithLoop) {
 TEST(HammockHierarchy, BuildsTreeAndAssignsEveryVertexOnce) {
     std::mt19937 rng(29);
     for (std::size_t iteration = 0; iteration < 200; ++iteration) {
-        const auto program = test::randomProgramGraph(rng, 2 + iteration % 40, iteration % 30);
+        SCOPED_TRACE(iteration);
+        const auto program = iteration % 2 == 0 ? test::randomProgramGraph(rng, 2 + iteration % 40, iteration % 30)
+                                                : test::randomStructuredProgram(rng, 3 + iteration % 40);
         const auto hammocks = findHammocks(program);
-        const auto hierarchy = buildHammockPresentation(hammocks);
+        const auto reference = buildHammockPresentation(hammocks);
+        const auto hierarchy = buildHammockPresentation(program);
         EXPECT_EQ(hierarchy.clusters().size(), selectPresentationHammocks(hammocks).size());
+        ASSERT_EQ(hierarchy.clusters().size(), reference.clusters().size());
+        EXPECT_TRUE(std::ranges::equal(hierarchy.topLevelMembers(), reference.topLevelMembers()));
 
         std::vector<int> seen(program.vertexCount(), 0);
         std::size_t clusterMembers = 0;
@@ -282,6 +293,12 @@ TEST(HammockHierarchy, BuildsTreeAndAssignsEveryVertexOnce) {
         visit(HammockHierarchy::kRoot);
         for (std::size_t c = 0; c < hierarchy.clusters().size(); ++c) {
             const auto& cluster = hierarchy.cluster(c);
+            const auto& expected = reference.cluster(c);
+            EXPECT_EQ(cluster.hammock, expected.hammock);
+            EXPECT_EQ(cluster.kind, expected.kind);
+            EXPECT_EQ(cluster.parent, expected.parent);
+            EXPECT_EQ(cluster.depth, expected.depth);
+            EXPECT_EQ(cluster.members, expected.members);
             EXPECT_NE(cluster.kind, HammockKind::Decomposable);
             // Каждая вершина кластера принадлежит его гамаку.
             for (const VertexId v : cluster.ownVertices) {
