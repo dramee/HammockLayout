@@ -5,6 +5,7 @@ add_executable(hammock_tests
     hammocks_test.cpp
     linear_components_test.cpp
     hierarchy_test.cpp
+    sugiyama_test.cpp
     graphml_test.cpp
     examples_test.cpp)
 

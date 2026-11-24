@@ -13,6 +13,8 @@
 
 namespace hammock {
 
+struct SugiyamaLayout;
+
 /// Ошибка чтения или разбора GraphML.
 class GraphMLError : public std::runtime_error {
 public:
@@ -51,7 +53,15 @@ public:
     /// или «Составной гамак K (p → q)».
     void writeHierarchical(std::ostream& out, const HammockHierarchy& hierarchy) const;
 
+    /// Записывает иерархический GraphML с раскладкой Сугиямы.
+    /// Узлы содержат layout.x, layout.y, layout.width, layout.height.
+    /// Дуги содержат layout.points в формате "x,y x,y ..." в исходном направлении.
+    /// Координаты абсолютные для всех уровней вложенности.
+    void writeSugiyama(std::ostream& out, const HammockHierarchy& hierarchy) const;
+
 private:
+    void writeHierarchical(std::ostream& out, const HammockHierarchy& hierarchy, const SugiyamaLayout* layout) const;
+
     struct Impl;
     explicit GraphMLDocument(std::unique_ptr<Impl> impl);
 

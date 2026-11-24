@@ -30,6 +30,7 @@ add_library(hammock
     src/hammocks.cpp
     src/linear_components.cpp
     src/hierarchy.cpp
+    src/sugiyama.cpp
     src/graphml.cpp)
 add_library(hammock::hammock ALIAS hammock)
 
@@ -41,6 +42,10 @@ target_compile_features(hammock PUBLIC cxx_std_20)
 # pugixml скрыт за pimpl и не виден в публичных заголовках.
 target_link_libraries(hammock PRIVATE pugixml::pugixml)
 hammock_set_warnings(hammock)
+
+if(PROJECT_IS_TOP_LEVEL)
+    add_subdirectory(examples)
+endif()
 
 # ---------------------------------------------------------------------------
 # Тесты

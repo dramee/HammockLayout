@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="592" height="1180" viewBox="0 0 592.000000 1180.000000" role="img">
+  <title>Вложенные циклы</title>
+  <desc>Граф потока управления. Цветные рамки показывают гамаки, пунктирные стрелки показывают обратные дуги.</desc>
+  <rect x="0" y="0" width="592" height="1180" rx="0" fill="#ffffff" stroke="none" />
+  <defs>
+    <marker id="forward-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0,0 L 10,5 L 0,10 Z" fill="#42536a" />
+    </marker>
+    <marker id="back-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0,0 L 10,5 L 0,10 Z" fill="#a54128" />
+    </marker>
+  </defs>
+  <g>
+    <rect x="28" y="28" width="552" height="1140" rx="9" fill="#f2f6fe" stroke="#35577a" />
+    <rect x="56" y="232" width="496" height="732" rx="9" fill="#f3faf5" stroke="#32664e" />
+    <rect x="84" y="436" width="396" height="412" rx="9" fill="#f3faf5" stroke="#32664e" />
+    <rect x="112" y="552" width="296" height="180" rx="9" fill="#f3faf5" stroke="#32664e" />
+  </g>
+  <g fill="none" stroke-width="1.3999999999999999" stroke-linejoin="round">
+    <polyline points="304.000000,92.000000 304.000000,100.000000 304.000000,136.000000 304.000000,144.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="304.000000,180.000000 304.000000,188.000000 538.000000,224.000000 538.000000,232.000000 538.000000,252.000000 304.000000,252.000000 304.000000,260.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="304.000000,296.000000 304.000000,304.000000 282.000000,340.000000 282.000000,348.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="304.000000,296.000000 304.000000,304.000000 538.000000,304.000000 538.000000,964.000000 538.000000,972.000000 304.000000,1008.000000 304.000000,1016.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="282.000000,384.000000 282.000000,392.000000 466.000000,428.000000 466.000000,436.000000 466.000000,456.000000 282.000000,456.000000 282.000000,464.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="282.000000,500.000000 282.000000,508.000000 394.000000,544.000000 394.000000,552.000000 394.000000,572.000000 260.000000,572.000000 260.000000,580.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="282.000000,500.000000 282.000000,508.000000 466.000000,508.000000 466.000000,848.000000 466.000000,856.000000 304.000000,892.000000 304.000000,900.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="260.000000,616.000000 260.000000,624.000000 328.000000,660.000000 328.000000,668.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="260.000000,616.000000 260.000000,624.000000 192.000000,660.000000 192.000000,668.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="328.000000,704.000000 328.000000,712.000000 394.000000,712.000000 394.000000,732.000000 394.000000,740.000000 282.000000,776.000000 282.000000,784.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="192.000000,704.000000 192.000000,712.000000 394.000000,712.000000 394.000000,732.000000 394.000000,740.000000 282.000000,776.000000 282.000000,784.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+    <polyline points="282.000000,784.000000 282.000000,776.000000 446.000000,740.000000 446.000000,544.000000 346.000000,508.000000 346.000000,482.000000 334.000000,482.000000" stroke="#a54128" marker-end="url(#back-arrow)" stroke-dasharray="5 3" />
+    <polyline points="304.000000,900.000000 304.000000,892.000000 518.000000,856.000000 518.000000,428.000000 372.000000,392.000000 372.000000,340.000000 368.000000,304.000000 368.000000,278.000000 356.000000,278.000000" stroke="#a54128" marker-end="url(#back-arrow)" stroke-dasharray="5 3" />
+    <polyline points="304.000000,1052.000000 304.000000,1060.000000 304.000000,1096.000000 304.000000,1104.000000" stroke="#42536a" marker-end="url(#forward-arrow)" />
+  </g>
+  <g font-family="Arial, sans-serif" font-size="12" font-weight="600">
+    <text x="38" y="43" fill="#35577a">Составной гамак 1</text>
+    <text x="66" y="247" fill="#32664e">Простой гамак 2</text>
+    <text x="94" y="451" fill="#32664e">Простой гамак 3</text>
+    <text x="122" y="567" fill="#32664e">Простой гамак 4</text>
+  </g>
+  <g font-family="Consolas, monospace" font-size="12" text-anchor="middle" fill="#182536">
+    <g data-node-id="entry">
+      <rect x="252" y="56" width="104" height="36" rx="6" fill="#deebfb" stroke="#586c86" />
+      <text x="304" y="78" font-size="12">1</text>
+    </g>
+    <g data-node-id="init">
+      <rect x="252" y="144" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="304" y="166" font-size="12">2</text>
+    </g>
+    <g data-node-id="outer">
+      <rect x="252" y="260" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="304" y="282" font-size="12">3</text>
+    </g>
+    <g data-node-id="initj">
+      <rect x="230" y="348" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="282" y="370" font-size="12">4</text>
+    </g>
+    <g data-node-id="inner">
+      <rect x="230" y="464" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="282" y="486" font-size="12">5</text>
+    </g>
+    <g data-node-id="cond">
+      <rect x="208" y="580" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="260" y="602" font-size="12">6</text>
+    </g>
+    <g data-node-id="add">
+      <rect x="276" y="668" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="328" y="690" font-size="12">7</text>
+    </g>
+    <g data-node-id="sub">
+      <rect x="140" y="668" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="192" y="690" font-size="12">8</text>
+    </g>
+    <g data-node-id="incj">
+      <rect x="230" y="784" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="282" y="806" font-size="12">9</text>
+    </g>
+    <g data-node-id="inci">
+      <rect x="252" y="900" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="304" y="922" font-size="12">10</text>
+    </g>
+    <g data-node-id="print">
+      <rect x="252" y="1016" width="104" height="36" rx="6" fill="#ffffff" stroke="#586c86" />
+      <text x="304" y="1038" font-size="12">11</text>
+    </g>
+    <g data-node-id="exit">
+      <rect x="252" y="1104" width="104" height="36" rx="6" fill="#deebfb" stroke="#586c86" />
+      <text x="304" y="1126" font-size="12">12</text>
+    </g>
+  </g>
+</svg>

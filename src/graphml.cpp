@@ -1,5 +1,7 @@
 #include "hammock/graphml.hpp"
 
+#include "hammock/sugiyama.hpp"
+
 #include <pugixml.hpp>
 
 #include <algorithm>
@@ -7,6 +9,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <locale>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -49,7 +52,7 @@ std::size_t lineAt(std::string_view text, std::ptrdiff_t offset) {
 }
 
 /// Копирует узел без вложенного графа: атрибуты, <data>, <port> и т. п.
-void appendShallowCopy(pugi::xml_node parent, const pugi::xml_node& source) {
+pugi::xml_node appendShallowCopy(pugi::xml_node parent, const pugi::xml_node& source) {
     pugi::xml_node copy = parent.append_child(source.name());
     for (const pugi::xml_attribute& attribute : source.attributes()) {
         copy.append_copy(attribute);
@@ -59,6 +62,7 @@ void appendShallowCopy(pugi::xml_node parent, const pugi::xml_node& source) {
             copy.append_copy(child);
         }
     }
+    return copy;
 }
 
 std::string labelPrefix(HammockKind kind) {
@@ -89,6 +93,7 @@ struct GraphMLDocument::Impl {
     struct EdgeRecord {
         VertexId source;
         VertexId target;
+        std::size_t slot;
         pugi::xml_node element;
     };
 
@@ -213,8 +218,9 @@ void GraphMLDocument::Impl::resolveEdges(const std::vector<pugi::xml_node>& pend
     for (const pugi::xml_node& edge : pendingEdges) {
         const VertexId source = resolve(edge, "source");
         const VertexId target = resolve(edge, "target");
+        const std::size_t slot = digraph.successors(source).size();
         digraph.addEdge(source, target);
-        edges.push_back({source, target, edge});
+        edges.push_back({source, target, slot, edge});
     }
 }
 
@@ -254,6 +260,16 @@ std::optional<VertexId> GraphMLDocument::findNode(std::string_view id) const {
 }
 
 void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarchy& hierarchy) const {
+    writeHierarchical(out, hierarchy, nullptr);
+}
+
+void GraphMLDocument::writeSugiyama(std::ostream& out, const HammockHierarchy& hierarchy) const {
+    const SugiyamaLayout layout = layoutSugiyama(graph(), hierarchy);
+    writeHierarchical(out, hierarchy, &layout);
+}
+
+void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarchy& hierarchy,
+                                        const SugiyamaLayout* layout) const {
     const Impl& source = *impl_;
     const auto clusters = hierarchy.clusters();
 
@@ -292,11 +308,12 @@ void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarch
         }
     }
 
-    const auto declareKey = [&](const std::string& baseId, const char* name, const char* type) {
+    const auto declareKey = [&](const std::string& baseId, const char* name, const char* type,
+                                const char* domain = "node") {
         const std::string id = makeUnique(baseId, keyIds);
         pugi::xml_node key = graphml.append_child("key");
         key.append_attribute("id") = id.c_str();
-        key.append_attribute("for") = "node";
+        key.append_attribute("for") = domain;
         key.append_attribute("attr.name") = name;
         key.append_attribute("attr.type") = type;
         return id;
@@ -309,6 +326,28 @@ void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarch
     const std::string endKey = declareKey("hl_end", "hammock.end", "string");
     const std::string sizeKey = declareKey("hl_size", "hammock.size", "int");
     const std::string depthKey = declareKey("hl_depth", "hammock.depth", "int");
+
+    struct GeometryKeys {
+        std::string x, y, width, height, points;
+    };
+    GeometryKeys geometry;
+    if (layout != nullptr) {
+        const auto layoutKey = [&](const char* id, const char* name, const char* type, const char* domain) {
+            for (const pugi::xml_node& key : source.root.children()) {
+                if (isElement(key, "key") && std::string_view(key.attribute("attr.name").as_string()) == name &&
+                    std::string_view(key.attribute("attr.type").as_string()) == type &&
+                    std::string_view(key.attribute("for").as_string()) == domain) {
+                    return std::string(key.attribute("id").as_string());
+                }
+            }
+            return declareKey(id, name, type, domain);
+        };
+        geometry = {layoutKey("hl_x", "layout.x", "double", "node"),
+                    layoutKey("hl_y", "layout.y", "double", "node"),
+                    layoutKey("hl_width", "layout.width", "double", "node"),
+                    layoutKey("hl_height", "layout.height", "double", "node"),
+                    layoutKey("hl_points", "layout.points", "string", "edge")};
+    }
 
     for (const pugi::xml_node& child : source.root.children()) {
         if (isElement(child, "data")) {
@@ -341,18 +380,34 @@ void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarch
     }
 
     // Рёбра группируются по наименьшему общему предку концов.
-    std::vector<std::vector<pugi::xml_node>> edgesByCluster(clusters.size());
-    std::vector<pugi::xml_node> topEdges;
+    std::vector<std::vector<const Impl::EdgeRecord*>> edgesByCluster(clusters.size());
+    std::vector<const Impl::EdgeRecord*> topEdges;
     for (const Impl::EdgeRecord& edge : source.edges) {
         const std::size_t owner =
             hierarchy.lowestCommonAncestor(hierarchy.clusterOf(edge.source), hierarchy.clusterOf(edge.target));
-        (owner == HammockHierarchy::kRoot ? topEdges : edgesByCluster[owner]).push_back(edge.element);
+        (owner == HammockHierarchy::kRoot ? topEdges : edgesByCluster[owner]).push_back(&edge);
     }
 
     const auto appendData = [](pugi::xml_node node, const std::string& key, const std::string& value) {
         pugi::xml_node data = node.append_child("data");
         data.append_attribute("key") = key.c_str();
         data.text().set(value.c_str());
+    };
+    const auto layoutData = [](pugi::xml_node element, const std::string& key) {
+        for (const pugi::xml_node& child : element.children()) {
+            if (isElement(child, "data") && std::string_view(child.attribute("key").as_string()) == key) {
+                return child.text();
+            }
+        }
+        pugi::xml_node child = element.append_child("data");
+        child.append_attribute("key") = key.c_str();
+        return child.text();
+    };
+    const auto writeBox = [&](pugi::xml_node node, const LayoutRect& box) {
+        layoutData(node, geometry.x).set(box.x);
+        layoutData(node, geometry.y).set(box.y);
+        layoutData(node, geometry.width).set(box.width);
+        layoutData(node, geometry.height).set(box.height);
     };
 
     // Узел-кластер: описание гамака и вложенный граф с его содержимым.
@@ -374,6 +429,9 @@ void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarch
         }
         appendData(node, sizeKey, std::to_string(cluster.hammock.size));
         appendData(node, depthKey, std::to_string(cluster.depth));
+        if (layout != nullptr) {
+            writeBox(node, layout->clusters[c]);
+        }
 
         pugi::xml_node nested = node.append_child("graph");
         nested.append_attribute("id") = makeUnique(clusterIds[c] + ":", usedIds).c_str();
@@ -392,14 +450,29 @@ void GraphMLDocument::writeHierarchical(std::ostream& out, const HammockHierarch
         pending.pop_back();
         for (const HammockHierarchy::Member& member : hierarchy.members(level.cluster)) {
             if (member.kind == HammockHierarchy::Member::Kind::Vertex) {
-                appendShallowCopy(level.graphElement, source.nodeElements.at(member.index));
+                const auto node = appendShallowCopy(level.graphElement, source.nodeElements.at(member.index));
+                if (layout != nullptr) {
+                    writeBox(node, layout->vertices[member.index]);
+                }
             } else {
                 pending.push_back({appendClusterNode(level.graphElement, member.index), member.index});
             }
         }
         const auto& levelEdges = level.cluster == HammockHierarchy::kRoot ? topEdges : edgesByCluster[level.cluster];
-        for (const pugi::xml_node& edge : levelEdges) {
-            level.graphElement.append_copy(edge);
+        for (const Impl::EdgeRecord* edge : levelEdges) {
+            const auto copy = level.graphElement.append_copy(edge->element);
+            if (layout != nullptr) {
+                const auto& points = layout->edgeRoutes[edge->source][edge->slot];
+                std::ostringstream value;
+                value.imbue(std::locale::classic());
+                for (std::size_t i = 0; i < points.size(); ++i) {
+                    if (i != 0) {
+                        value << ' ';
+                    }
+                    value << points[i].x << ',' << points[i].y;
+                }
+                layoutData(copy, geometry.points).set(value.str().c_str());
+            }
         }
     }
 
