@@ -17,6 +17,9 @@ struct Hammock {
     VertexId end = kNoVertex;    ///< конечная вершина q ∉ U или kNoVertex, если её нет
     std::size_t first = 0;       ///< L-номер начальной вершины
     std::size_t size = 0;        ///< число вершин |U|
+    bool singletonHasLoop = false;  ///< у одновершинного гамака есть внутренняя дуга
+
+    [[nodiscard]] bool isTrivial() const noexcept { return size == 1 && !singletonHasLoop; }
 
     /// L-номер, следующий за последней вершиной гамака.
     [[nodiscard]] std::size_t last() const noexcept { return first + size; }

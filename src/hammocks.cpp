@@ -45,6 +45,7 @@ HammockSet findHammocks(const ProgramGraph& program) {
         for (const VertexId u : graph.predecessors(p)) {
             predecessorOf[u] = p;
         }
+        const bool hasLoop = predecessorOf[p] == p;
 
         // Характеристики текущего множества U = { v : first ≤ L(v) < end } (лемма 5):
         //   R(U) = { u ∈ Г⁻¹(U \ {p}) : L(u) < L(p) }  — при R ≠ ∅ перебор прекращается;
@@ -70,31 +71,42 @@ HammockSet findHammocks(const ProgramGraph& program) {
             }
 
             if (v != p) {
-                const auto predecessors = graph.predecessors(v);
-                const bool rNonEmpty = std::ranges::any_of(predecessors, [&](VertexId u) { return l[u] < first; });
+                bool rNonEmpty = false;
+                for (const VertexId u : graph.predecessors(v)) {
+                    const std::size_t position = l[u];
+                    if (position < first) {
+                        rNonEmpty = true;
+                        break;
+                    }
+                    fMax = std::max(fMax, position);
+                }
                 if (rNonEmpty) {
                     break;  // R(U) только растёт с ростом U
                 }
-                for (const VertexId u : predecessors) {
-                    fMax = std::max(fMax, l[u]);
-                }
             }
 
-            bool kOverflow = false;
+            bool invalidSuccessor = false;
             for (const VertexId s : graph.successors(v)) {
                 if (m[s] < mp) {
                     if (kVertex == kNoVertex) {
                         kVertex = s;
                     } else if (kVertex != s) {
-                        kOverflow = true;
+                        invalidSuccessor = true;  // |K(U)| ≥ 2
                         break;
                     }
                 } else if (m[s] > mp) {
-                    eMax = std::max(eMax.value_or(0), l[s]);
+                    const std::size_t position = l[s];
+                    // МНОЖ3: такой преемник всегда вне отрезка и не может быть
+                    // его конечной вершиной при M(s) > M(p).
+                    if (position < first) {
+                        invalidSuccessor = true;
+                        break;
+                    }
+                    eMax = std::max(eMax.value_or(0), position);
                 }
             }
-            if (kOverflow) {
-                break;  // |K(U)| ≥ 2, и K(U) только растёт с ростом U
+            if (invalidSuccessor) {
+                break;
             }
 
             // Лемма 5 (L(p) + |U| = end).
@@ -106,7 +118,7 @@ HammockSet findHammocks(const ProgramGraph& program) {
             if (containsExit) {
                 // Гамак без конечной вершины: K(U) = ∅ и E(U) < L(p) + |U|, т. е. Г(U) ⊆ U.
                 if (kVertex == kNoVertex && allSuccessorsInside) {
-                    result.push_back({p, kNoVertex, first, end - first});
+                    result.push_back({p, kNoVertex, first, end - first, end - first == 1 && hasLoop});
                 }
                 continue;
             }
@@ -126,7 +138,12 @@ HammockSet findHammocks(const ProgramGraph& program) {
             if (predecessorOf[q] == p) {
                 continue;  // p ∈ Г(q)
             }
-            result.push_back({p, q, first, end - first});
+            result.push_back({p, q, first, end - first, end - first == 1 && hasLoop});
+            if (kVertex != kNoVertex) {
+                // K уже фиксирует q для всех расширений. Гамак с этой парой
+                // (p, q) единственен: это множество достижимых из p без прохода через q.
+                break;
+            }
         }
     }
     return {std::move(l), std::move(result)};

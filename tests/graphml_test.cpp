@@ -35,8 +35,8 @@ constexpr const char* kIfThenElse = R"(<?xml version="1.0" encoding="UTF-8"?>
 </graphml>
 )";
 
-std::string writeHierarchy(const GraphMLDocument& document) {
-    const auto program = ProgramGraph::withDetectedTerminals(document.graph());
+std::string writeHierarchy(const GraphMLDocument& document, std::string_view entryId, std::string_view exitId) {
+    const ProgramGraph program(document.graph(), document.findNode(entryId).value(), document.findNode(exitId).value());
     const auto hierarchy = buildHammockPresentation(findHammocks(program));
     std::ostringstream out;
     document.writeHierarchical(out, hierarchy);
@@ -117,7 +117,7 @@ TEST(GraphML, AcceptsExplicitlyDirectedEdgesInUndirectedGraph) {
 
 TEST(GraphML, WritesHierarchicalGraph) {
     const auto document = GraphMLDocument::loadString(kIfThenElse);
-    const std::string output = writeHierarchy(document);
+    const std::string output = writeHierarchy(document, "start", "end");
 
     pugi::xml_document xml;
     ASSERT_TRUE(xml.load_string(output.c_str())) << output;
@@ -131,25 +131,21 @@ TEST(GraphML, WritesHierarchicalGraph) {
     EXPECT_TRUE(graphml.find_child_by_attribute("key", "attr.name", "hammock.kind"));
     EXPECT_FALSE(graphml.find_child_by_attribute("key", "id", "hl_label"));
 
-    // Гамачное представление: составной гамак X (весь граф) содержит простые гамаки
-    // {start}, {cond, then, else} ⊃ {then}, {else}, {join}, {end} — гамаки любого размера.
+    // Весь граф содержит кластер ветвления {cond, then, else}.
     std::map<std::string, std::vector<std::string>> parents;
     for (const pugi::xpath_node& node : xml.select_nodes("//node")) {
         parents[node.node().attribute("id").as_string()] = enclosingClusters(node.node());
     }
-    EXPECT_EQ(parents.size(), 13U);  // 6 исходных узлов + 7 кластеров
-    for (const char* id : {"start", "cond", "join", "end"}) {
-        EXPECT_EQ(parents[id].size(), 2U) << id;
-    }
-    EXPECT_EQ(parents["then"].size(), 3U);
-    EXPECT_EQ(parents["else"].size(), 3U);
+    EXPECT_EQ(parents.size(), 8U);  // 6 исходных узлов + 2 кластера
+    ASSERT_EQ(parents["start"].size(), 1U);
+    ASSERT_EQ(parents["cond"].size(), 2U);
     const std::string whole = parents["start"].back();
     const std::string branch = parents["cond"].front();  // {cond, then, else}
-    EXPECT_EQ(parents["then"][1], branch);
-    EXPECT_EQ(parents["else"][1], branch);
-    EXPECT_NE(parents["then"].front(), parents["else"].front());
-    for (const char* id : {"start", "cond", "then", "else", "join", "end"}) {
-        EXPECT_EQ(parents[id].back(), whole) << id;
+    for (const char* id : {"cond", "then", "else"}) {
+        EXPECT_EQ(parents[id], (std::vector<std::string>{branch, whole})) << id;
+    }
+    for (const char* id : {"join", "end"}) {
+        EXPECT_EQ(parents[id], std::vector<std::string>{whole}) << id;
     }
 
     // Данные узлов и рёбер перенесены.
@@ -170,7 +166,12 @@ TEST(GraphML, WritesHierarchicalGraph) {
 
 TEST(GraphML, OutputCanBeReadBack) {
     const auto document = GraphMLDocument::loadString(kIfThenElse);
-    const auto reread = GraphMLDocument::loadString(writeHierarchy(document));
+    const auto reread = GraphMLDocument::loadString(writeHierarchy(document, "start", "end"));
+    const auto entry = reread.findNode("start");
+    const auto exit = reread.findNode("end");
+    ASSERT_TRUE(entry.has_value());
+    ASSERT_TRUE(exit.has_value());
+    EXPECT_NO_THROW((void)ProgramGraph(reread.graph(), *entry, *exit));
     ASSERT_EQ(reread.graph().vertexCount(), document.graph().vertexCount());
     ASSERT_EQ(reread.graph().edgeCount(), document.graph().edgeCount());
     for (VertexId v = 0; v < document.graph().vertexCount(); ++v) {
@@ -183,7 +184,7 @@ TEST(GraphML, OutputCanBeReadBack) {
 TEST(GraphML, HammockWithoutEndHasNoEndAttribute) {
     const auto document = GraphMLDocument::loadString(kIfThenElse);
     pugi::xml_document xml;
-    ASSERT_TRUE(xml.load_string(writeHierarchy(document).c_str()));
+    ASSERT_TRUE(xml.load_string(writeHierarchy(document, "start", "end").c_str()));
     const pugi::xml_node root = xml.select_node("/graphml/graph/node[graph]").node();
     ASSERT_TRUE(root);
     EXPECT_STREQ(root.find_child_by_attribute("data", "key", "hl_kind").text().as_string(), "compound");
@@ -197,7 +198,7 @@ TEST(GraphML, GeneratesUniqueClusterIds) {
         <node id="hammock1"/><node id="b"/><node id="c"/><node id="d"/>
         <edge source="hammock1" target="b"/><edge source="b" target="c"/>
         <edge source="b" target="d"/><edge source="c" target="d"/></graph></graphml>)");
-    const std::string output = writeHierarchy(document);
+    const std::string output = writeHierarchy(document, "hammock1", "d");
     pugi::xml_document xml;
     ASSERT_TRUE(xml.load_string(output.c_str()));
     std::map<std::string, int> counts;

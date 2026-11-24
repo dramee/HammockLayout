@@ -149,7 +149,7 @@ std::vector<Hammock> selectPresentationHammocks(const HammockSet& hammocks) {
     const std::vector<HammockKind> kinds = classifyHammocks(hammocks);
     std::vector<Hammock> result;
     for (std::size_t i = 0; i < hammocks.size(); ++i) {
-        if (kinds[i] != HammockKind::Decomposable) {
+        if (kinds[i] != HammockKind::Decomposable && !hammocks[i].isTrivial()) {
             result.push_back(hammocks[i]);
         }
     }
@@ -247,7 +247,7 @@ HammockHierarchy buildHammockPresentation(const HammockSet& hammocks) {
     std::vector<Hammock> family;
     std::vector<HammockKind> kinds;
     for (std::size_t i = 0; i < hammocks.size(); ++i) {
-        if (allKinds[i] != HammockKind::Decomposable) {
+        if (allKinds[i] != HammockKind::Decomposable && !hammocks[i].isTrivial()) {
             family.push_back(hammocks[i]);
             kinds.push_back(allKinds[i]);
         }

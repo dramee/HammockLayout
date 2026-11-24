@@ -153,11 +153,56 @@ TEST(PresentationHammocks, BookExample) {
     }
     EXPECT_EQ(simple, expectedSimple);
     EXPECT_EQ(compound, expectedCompound);
+
+    auto expectedPresentation = expectedSimple;
+    for (const VertexId v : {2U, 7U, 15U}) {
+        expectedPresentation.erase(VertexSet{v});  // {3}, {8}, {16} в нумерации книги
+    }
+    expectedPresentation.insert(expectedCompound.begin(), expectedCompound.end());
+    std::set<VertexSet> selected;
+    for (const auto& h : selectPresentationHammocks(hammocks)) {
+        const auto vertices = hammocks.vertices(h);
+        VertexSet key(vertices.begin(), vertices.end());
+        std::ranges::sort(key);
+        selected.insert(std::move(key));
+    }
+    EXPECT_EQ(selected, expectedPresentation);  // {10} и {11} с петлями остаются
+
+    const auto hierarchy = buildHammockPresentation(hammocks);
+    const auto verticesOf = [&](std::size_t index) {
+        const auto vertices = hammocks.vertices(hierarchy.cluster(index).hammock);
+        VertexSet key(vertices.begin(), vertices.end());
+        std::ranges::sort(key);
+        return key;
+    };
+    const auto singleton = hierarchy.clusterOf(9);  // {10} в нумерации книги
+    ASSERT_NE(singleton, HammockHierarchy::kRoot);
+    const auto inner = hierarchy.cluster(singleton).parent;
+    ASSERT_NE(inner, HammockHierarchy::kRoot);
+    EXPECT_EQ(verticesOf(inner), range(7, 11));
+    EXPECT_EQ(hierarchy.cluster(inner).kind, HammockKind::Compound);
+
+    const auto enclosing = hierarchy.cluster(inner).parent;
+    ASSERT_NE(enclosing, HammockHierarchy::kRoot);
+    EXPECT_EQ(verticesOf(enclosing), range(5, 12));
+    EXPECT_EQ(hierarchy.cluster(enclosing).kind, HammockKind::Simple);
+
+    const auto root = hierarchy.cluster(enclosing).parent;
+    ASSERT_NE(root, HammockHierarchy::kRoot);
+    EXPECT_EQ(verticesOf(root), range(1, 16));
+    EXPECT_EQ(hierarchy.cluster(root).kind, HammockKind::Compound);
+    EXPECT_EQ(hierarchy.cluster(root).parent, HammockHierarchy::kRoot);
+
+    std::vector<VertexSet> components;
+    for (const auto child : hierarchy.cluster(inner).children) {
+        components.push_back(verticesOf(child));
+    }
+    EXPECT_EQ(components, (std::vector<VertexSet>{range(7, 9), range(10, 10), range(11, 11)}));
 }
 
 // Тело цикла из трёх частей: {a, m} и {m, b} — максимальные разложимые гамаки,
 // которые частично пересекаются (всё тело не гамак из-за дуги h → a). Составными
-// они не считаются, и a, m, b остаются простыми гамаками внутри цикла.
+// они не считаются, и a, m, b остаются обычными вершинами кластера цикла.
 TEST(PresentationHammocks, LoopBodyOfThreeParts) {
     // 0 вход, 1 h, 2 a, 3 m, 4 b, 5 выход.
     const ProgramGraph program(test::makeGraph(6, {{0, 1}, {1, 2}, {1, 5}, {2, 3}, {3, 4}, {4, 1}}), 0, 5);
@@ -170,9 +215,9 @@ TEST(PresentationHammocks, LoopBodyOfThreeParts) {
     ASSERT_NE(loop, HammockHierarchy::kRoot);
     EXPECT_EQ(hierarchy.cluster(loop).hammock.size, 4U);
     EXPECT_EQ(hierarchy.cluster(loop).kind, HammockKind::Simple);
-    EXPECT_EQ(hierarchy.cluster(loop).children.size(), 3U);  // {a}, {m}, {b}
+    EXPECT_TRUE(hierarchy.cluster(loop).children.empty());
     for (const VertexId v : {2U, 3U, 4U}) {
-        EXPECT_EQ(hierarchy.cluster(hierarchy.clusterOf(v)).parent, loop);
+        EXPECT_EQ(hierarchy.clusterOf(v), loop);
     }
 }
 
@@ -193,26 +238,24 @@ TEST(PresentationHammocks, WholeGraphIsTheCompoundRoot) {
         }
     }
     EXPECT_EQ(compound, 1U);
-    EXPECT_EQ(selectPresentationHammocks(hammocks).size(), 6U);
+    EXPECT_EQ(selectPresentationHammocks(hammocks).size(), 1U);
 }
 
-TEST(PresentationHammocks, IncludesHammocksOfAnySize) {
-    // Цепочка 0 → 1 → 2 → 3 → 4: составной гамак (весь граф) содержит пять
-    // простых одновершинных гамаков — каждая вершина в своём кластере.
-    const auto hierarchy = buildHammockPresentation(findHammocks(test::makeChain(5)));
-    ASSERT_EQ(hierarchy.clusters().size(), 6U);
+TEST(PresentationHammocks, KeepsSingletonWithLoop) {
+    const ProgramGraph program(test::makeGraph(3, {{0, 1}, {1, 1}, {1, 2}}), 0, 2);
+    const auto hierarchy = buildHammockPresentation(findHammocks(program));
+    ASSERT_EQ(hierarchy.clusters().size(), 2U);
     ASSERT_EQ(hierarchy.topLevelClusters().size(), 1U);
     const auto& root = hierarchy.cluster(hierarchy.topLevelClusters()[0]);
     EXPECT_EQ(root.kind, HammockKind::Compound);
-    EXPECT_EQ(root.hammock.size, 5U);
-    EXPECT_EQ(root.children.size(), 5U);
-    EXPECT_TRUE(root.ownVertices.empty());
+    EXPECT_EQ(root.hammock.size, 3U);
+    ASSERT_EQ(root.children.size(), 1U);
+    EXPECT_EQ(root.ownVertices, (std::vector<VertexId>{0, 2}));
     EXPECT_TRUE(hierarchy.topLevelVertices().empty());
-    for (const std::size_t child : root.children) {
-        EXPECT_EQ(hierarchy.cluster(child).kind, HammockKind::Simple);
-        EXPECT_EQ(hierarchy.cluster(child).hammock.size, 1U);
-        EXPECT_EQ(hierarchy.cluster(child).ownVertices.size(), 1U);
-    }
+    const auto& child = hierarchy.cluster(root.children.front());
+    EXPECT_EQ(child.kind, HammockKind::Simple);
+    EXPECT_EQ(child.hammock.size, 1U);
+    EXPECT_EQ(child.ownVertices, std::vector<VertexId>{1});
 }
 
 TEST(HammockHierarchy, BuildsTreeAndAssignsEveryVertexOnce) {

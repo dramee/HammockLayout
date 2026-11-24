@@ -48,6 +48,8 @@ TEST(ProgramGraph, RejectsDeadEnd) {
 
 TEST(ProgramGraph, RejectsSameEntryAndExitOrUnknownVertex) {
     EXPECT_THROW(ProgramGraph(Digraph(1), 0, 0), ProgramGraphError);
+    EXPECT_THROW(ProgramGraph(makeGraph(2, {{0, 1}}), kNoVertex, 1), ProgramGraphError);
+    EXPECT_THROW(ProgramGraph(makeGraph(2, {{0, 1}}), 0, kNoVertex), ProgramGraphError);
     EXPECT_THROW(ProgramGraph(makeGraph(2, {{0, 1}}), 0, 7), ProgramGraphError);
 }
 

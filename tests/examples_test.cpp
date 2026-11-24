@@ -54,7 +54,11 @@ TEST_P(Example, MatchesExpectedPresentation) {
     const fs::path expectedPath = kExamplesDir / "output" / (GetParam() + ".graphml");
 
     const auto document = GraphMLDocument::loadFile(input);
-    const auto program = ProgramGraph::withDetectedTerminals(document.graph());
+    const auto entry = document.findNode("entry");
+    const auto exit = document.findNode("exit");
+    ASSERT_TRUE(entry.has_value()) << "Нет входной вершины entry в " << input.string();
+    ASSERT_TRUE(exit.has_value()) << "Нет выходной вершины exit в " << input.string();
+    const ProgramGraph program(document.graph(), *entry, *exit);
     const auto hammocks = findHammocks(program);
     for (const Hammock& h : hammocks) {
         ASSERT_TRUE(isHammock(program, hammocks.vertices(h), h.start, h.end));
